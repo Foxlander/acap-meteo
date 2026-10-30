@@ -57,10 +57,11 @@ static gboolean event_ready;
 static GMutex result_lock;
 static char result_json[JSON_SIZE] = "{\"condition\":\"unknown\",\"label\":\"En attente de la première mesure\"}";
 
-/* Arrêt propre du thread de capture. */
+/* Réveil du thread de capture : arrêt de l'appli ou mesure demandée à la main. */
 static GMutex stop_lock;
 static GCond stop_cond;
 static gboolean stopping;
+static gboolean measure_requested;
 
 static int param_int(const char *name, int fallback) {
     gchar *value = NULL;
@@ -279,9 +280,11 @@ static gpointer capture_thread(gpointer data) {
         /* Attente jusqu'à la prochaine rafale (interruptible à l'arrêt). */
         gint64 deadline = g_get_monotonic_time() + (gint64)cfg.interval_s * G_TIME_SPAN_SECOND;
         g_mutex_lock(&stop_lock);
-        while (!stopping && g_cond_wait_until(&stop_cond, &stop_lock, deadline))
+        while (!stopping && !measure_requested && g_cond_wait_until(&stop_cond, &stop_lock, deadline))
             ;
         gboolean stop = stopping;
+        if (measure_requested) syslog(LOG_INFO, "Mesure demandée manuellement");
+        measure_requested = FALSE;
         g_mutex_unlock(&stop_lock);
         if (stop) break;
     }
@@ -289,7 +292,11 @@ static gpointer capture_thread(gpointer data) {
     return NULL;
 }
 
-/* Mini serveur HTTP : toute requête reçoit le dernier résultat en JSON. */
+/*
+ * Mini serveur HTTP derrière le reverse proxy de la caméra :
+ *   POST .../measure : lance une mesure tout de suite,
+ *   le reste         : renvoie le dernier résultat en JSON.
+ */
 static gboolean on_http_request(GThreadedSocketService *service, GSocketConnection *connection,
                                 GObject *source, gpointer data) {
     (void)service;
@@ -298,12 +305,25 @@ static gboolean on_http_request(GThreadedSocketService *service, GSocketConnecti
     char request[4096];
     GInputStream *in = g_io_stream_get_input_stream(G_IO_STREAM(connection));
     GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(connection));
-    if (g_input_stream_read(in, request, sizeof(request), NULL, NULL) <= 0) return TRUE;
+    gssize len = g_input_stream_read(in, request, sizeof(request) - 1, NULL, NULL);
+    if (len <= 0) return TRUE;
+    request[len] = '\0';
 
+    /* Première ligne : "POST /local/meteo/measure HTTP/1.1" */
+    char *eol = strpbrk(request, "\r\n");
+    if (eol) *eol = '\0';
     char json[JSON_SIZE];
-    g_mutex_lock(&result_lock);
-    g_strlcpy(json, result_json, sizeof(json));
-    g_mutex_unlock(&result_lock);
+    if (g_str_has_prefix(request, "POST ") && strstr(request, "measure")) {
+        g_mutex_lock(&stop_lock);
+        measure_requested = TRUE;
+        g_cond_signal(&stop_cond);
+        g_mutex_unlock(&stop_lock);
+        g_strlcpy(json, "{\"measure\":\"started\"}", sizeof(json));
+    } else {
+        g_mutex_lock(&result_lock);
+        g_strlcpy(json, result_json, sizeof(json));
+        g_mutex_unlock(&result_lock);
+    }
 
     gchar *response = g_strdup_printf("HTTP/1.1 200 OK\r\n"
                                       "Content-Type: application/json; charset=utf-8\r\n"

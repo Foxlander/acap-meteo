@@ -7,7 +7,7 @@
             "vendor": "Trinum",
             "embeddedSdkVersion": "3.0",
             "runMode": "respawn",
-            "version": "0.3.0",
+            "version": "0.4.0",
             "user": {
                 "username": "sdk",
                 "group": "sdk"
@@ -20,6 +20,11 @@
                     "apiPath": "status",
                     "target": "http://localhost:2001",
                     "access": "viewer"
+                },
+                {
+                    "apiPath": "measure",
+                    "target": "http://localhost:2001",
+                    "access": "operator"
                 }
             ],
             "paramConfig": [

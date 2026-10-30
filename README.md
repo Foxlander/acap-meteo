@@ -40,6 +40,8 @@ Toutes les `IntervalSeconds` secondes (5 min par défaut) :
                "sky_saturation":0.00,"temporal_noise":0.00,"temporal_specks":0.00000}}
   ```
   `condition` est la valeur lissée, `instant` la dernière mesure seule.
+- **Mesure manuelle** : bouton « Lancer une mesure » sur la page web, ou
+  `POST http://<ip-camera>/local/meteo/measure` (droits opérateur).
 - **Syslog** (*System* → *Logs*) : une ligne par mesure, et une ligne
   `Météo : …` à chaque changement.
 - **Événement Axis** *Météo Caméra → Météo* (événement à état), envoyé à chaque
@@ -56,7 +58,7 @@ Il faut Docker. La cible par défaut est `aarch64` (ARTPEC-8, ARTPEC-9, CV25…)
 ```sh
 docker build --tag meteo .
 docker cp $(docker create meteo):/opt/app ./build
-# => build/Meteo_Camera_0_3_0_aarch64.eap
+# => build/Meteo_Camera_0_4_0_aarch64.eap
 ```
 
 Pour une caméra ARTPEC-7 ou plus ancienne (32 bits) : `docker build --build-arg ARCH=armv7hf --tag meteo .`
