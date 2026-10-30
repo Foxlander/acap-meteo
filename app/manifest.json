@@ -4,7 +4,7 @@
         "setup": {
             "appName": "meteo",
             "friendlyName": "Meteo Camera",
-            "vendor": "Quentin",
+            "vendor": "Trinum",
             "embeddedSdkVersion": "3.0",
             "runMode": "respawn",
             "version": "0.3.0",
