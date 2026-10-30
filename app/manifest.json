@@ -1,0 +1,43 @@
+{
+    "schemaVersion": "1.7.3",
+    "acapPackageConf": {
+        "setup": {
+            "appName": "meteo",
+            "friendlyName": "Meteo Camera",
+            "vendor": "Quentin",
+            "embeddedSdkVersion": "3.0",
+            "runMode": "respawn",
+            "version": "0.1.0",
+            "user": {
+                "username": "sdk",
+                "group": "sdk"
+            }
+        },
+        "configuration": {
+            "settingPage": "index.html",
+            "reverseProxy": [
+                {
+                    "apiPath": "status",
+                    "target": "http://localhost:2001",
+                    "access": "viewer"
+                }
+            ],
+            "paramConfig": [
+                {"name": "IntervalSeconds", "default": "300", "type": "int:min=10;max=86400"},
+                {"name": "FrameCount", "default": "8", "type": "int:min=2;max=100"},
+                {"name": "FrameSpacingMs", "default": "500", "type": "int:min=40;max=10000"},
+                {"name": "HistorySize", "default": "3", "type": "int:min=1;max=24"},
+                {"name": "Channel", "default": "1", "type": "int:min=1;max=16"},
+                {"name": "SkyRatio", "default": "0.3", "type": "string"},
+                {"name": "NightLuma", "default": "35", "type": "string"},
+                {"name": "IrSaturation", "default": "0.5", "type": "string"},
+                {"name": "FogEdgeDensity", "default": "0.04", "type": "string"},
+                {"name": "FogContrast", "default": "28", "type": "string"},
+                {"name": "PrecipSpecks", "default": "0.004", "type": "string"},
+                {"name": "SnowLuma", "default": "150", "type": "string"},
+                {"name": "SunnySkyLuma", "default": "170", "type": "string"},
+                {"name": "SunnySaturation", "default": "14", "type": "string"}
+            ]
+        }
+    }
+}

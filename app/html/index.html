@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Météo Caméra</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; background: #f6f7f9; color: #1d2330; }
+  .card { background: #fff; border-radius: 10px; padding: 20px; max-width: 560px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .big { font-size: 2.4em; margin: 0 0 4px; }
+  .muted { color: #667085; }
+  table { border-collapse: collapse; margin-top: 16px; width: 100%; }
+  td { padding: 4px 8px; border-bottom: 1px solid #eef0f3; font-variant-numeric: tabular-nums; }
+  td:last-child { text-align: right; }
+</style>
+</head>
+<body>
+<div class="card">
+  <p class="big"><span id="icon">⏳</span> <span id="label">Chargement…</span></p>
+  <p class="muted" id="detail"></p>
+  <table id="features"></table>
+  <p class="muted">Les seuils se règlent dans les paramètres de l'application.
+    JSON brut : <a href="status">status</a></p>
+</div>
+<script>
+const icons = { sunny: "☀️", cloudy: "☁️", fog: "🌫️", rain: "🌧️", snow: "❄️", night: "🌙" };
+async function refresh() {
+  try {
+    const r = await fetch("status", { cache: "no-store" });
+    const d = await r.json();
+    document.getElementById("icon").textContent = icons[d.condition] || "❔";
+    document.getElementById("label").textContent = d.label;
+    if (d.instant) {
+      const when = new Date(d.timestamp * 1000).toLocaleTimeString();
+      document.getElementById("detail").textContent =
+        `Dernière mesure à ${when} : ${d.instant.label} (confiance ${Math.round(d.instant.confidence * 100)} %)` +
+        (d.precipitation ? ", précipitations détectées" : "");
+      document.getElementById("features").innerHTML = Object.entries(d.features)
+        .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+    }
+  } catch (e) {
+    document.getElementById("label").textContent = "Application injoignable";
+  }
+}
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

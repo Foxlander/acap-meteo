@@ -1,0 +1,21 @@
+PROG1 = meteo
+OBJS1 = $(PROG1).c weather.c
+
+PKGS = gio-2.0 glib-2.0 vdostream axparameter
+
+CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKGS))
+LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS))
+LDLIBS += -lm
+
+CFLAGS += -O2 -Wall -Wextra -Wformat=2 -Wpointer-arith -Wbad-function-cast -Wstrict-prototypes \
+	-Wmissing-prototypes -Winline -Wdisabled-optimization -Wfloat-equal -W -Werror
+
+.PHONY: all clean
+
+all: $(PROG1)
+
+$(PROG1): $(OBJS1)
+	$(CC) $^ $(CFLAGS) $(LIBS) $(LDFLAGS) $(LDLIBS) -o $@
+
+clean:
+	rm -f $(PROG1) *.o *.eap* *_LICENSE.txt package.conf* param.conf

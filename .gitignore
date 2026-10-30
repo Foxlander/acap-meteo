@@ -1,0 +1,3 @@
+build/
+tests/test_weather
+*.o
