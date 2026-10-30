@@ -239,7 +239,7 @@ const char *weather_condition_code(WeatherCondition c) {
 }
 
 const char *weather_condition_label(WeatherCondition c) {
-    static const char *labels[WEATHER_COUNT] = {"Ensoleillé", "Nuageux", "Brouillard",
+    static const char *labels[WEATHER_COUNT] = {"Ensoleillé", "Couvert", "Brouillard",
                                                 "Pluie", "Neige", "Nuit"};
     return (c >= 0 && c < WEATHER_COUNT) ? labels[c] : "Inconnu";
 }

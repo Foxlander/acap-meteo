@@ -5,45 +5,322 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Météo Caméra</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 24px; background: #f6f7f9; color: #1d2330; }
-  .card { background: #fff; border-radius: 10px; padding: 20px; max-width: 560px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .big { font-size: 2.4em; margin: 0 0 4px; }
-  .muted { color: #667085; }
-  table { border-collapse: collapse; margin-top: 16px; width: 100%; }
-  td { padding: 4px 8px; border-bottom: 1px solid #eef0f3; font-variant-numeric: tabular-nums; }
-  td:last-child { text-align: right; }
+  :root {
+    --bg: #141414;
+    --card: #1f1f1f;
+    --border: #2e2e2e;
+    --text: #f2f2f2;
+    --muted: #a3a3a3;
+    --accent: #f7c21b;
+    --ok: #4cc26b;
+    --ko: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+  }
+
+  /* Bandeau du haut */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--accent);
+    background: #1a1a1a;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: .5px; }
+  .brand .tag { background: var(--accent); color: #111; padding: 2px 8px; border-radius: 3px; }
+  .device { color: #d6d6d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .spacer { flex: 1; }
+  @media (max-width: 520px) { .device { display: none; } header { gap: 10px; } }
+  .pill {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--ok); }
+  .pill.ko { color: var(--ko); }
+  .pill.wait { color: var(--muted); }
+  .lang { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .lang button {
+    background: transparent; color: var(--text); border: 0; padding: 4px 9px;
+    font-weight: 700; cursor: pointer;
+  }
+  .lang button.active { background: var(--accent); color: #111; }
+
+  /* Mise en page */
+  main {
+    max-width: 1360px;
+    margin: 22px auto;
+    padding: 0 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px 18px 20px;
+  }
+  .card-title {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 16px; font-size: 16px; font-weight: 700;
+  }
+  .card-title::before {
+    content: ""; width: 4px; height: 22px; background: var(--accent); border-radius: 1px;
+  }
+  .card h2 { margin: 0 0 6px; font-size: 24px; font-weight: 800; }
+  .muted { color: var(--muted); line-height: 1.5; }
+
+  /* Météo actuelle */
+  .now {
+    display: flex; align-items: center; gap: 28px;
+    padding: 26px 18px; background: #181818; border: 1px solid var(--border); border-radius: 4px;
+  }
+  .now svg { width: 130px; height: 130px; flex: none; color: var(--accent); }
+  .now .label { font-size: 46px; font-weight: 800; line-height: 1.1; }
+  .now .sub { margin-top: 8px; }
+  @media (max-width: 600px) {
+    .now { flex-direction: column; text-align: center; }
+    .now .label { font-size: 34px; }
+  }
+
+  /* Tuiles des conditions */
+  .tiles {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 16px;
+  }
+  @media (max-width: 700px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .tile {
+    border: 1px solid var(--border); border-radius: 4px; padding: 12px 6px;
+    text-align: center; color: var(--muted); font-weight: 600;
+  }
+  .tile svg { width: 34px; height: 34px; display: block; margin: 0 auto 6px; }
+  .tile.active { border-color: var(--accent); color: var(--accent); background: rgba(247, 194, 27, .08); }
+
+  /* Détails */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row span:last-child { font-weight: 600; text-align: right; }
+  .badge {
+    display: inline-block; border: 1px solid var(--ok); color: var(--ok);
+    border-radius: 3px; padding: 0 6px; font-size: 12px; font-weight: 600;
+  }
+  .badge.rain { border-color: #5aa0ff; color: #5aa0ff; }
+  .bar { height: 6px; background: #333; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  a { color: var(--accent); }
 </style>
 </head>
 <body>
-<div class="card">
-  <p class="big"><span id="icon">⏳</span> <span id="label">Chargement…</span></p>
-  <p class="muted" id="detail"></p>
-  <table id="features"></table>
-  <p class="muted">Les seuils se règlent dans les paramètres de l'application.
-    JSON brut : <a href="status">status</a></p>
-</div>
+
+<header>
+  <div class="brand"><span>MÉTÉO</span><span class="tag">CAM</span></div>
+  <div class="device" id="device">Caméra Axis</div>
+  <div class="spacer"></div>
+  <span class="pill wait" id="state" data-i18n="waiting">En attente</span>
+  <div class="lang">
+    <button data-lang="fr" class="active">FR</button>
+    <button data-lang="en">EN</button>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card">
+      <div class="card-title" data-i18n="current">Météo actuelle</div>
+      <div class="now">
+        <svg id="now-icon" viewBox="0 0 64 64"></svg>
+        <div>
+          <div class="label" id="now-label">…</div>
+          <div class="sub muted" id="now-sub"></div>
+        </div>
+      </div>
+      <div class="tiles" id="tiles"></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <div class="card-title" data-i18n="lastMeasure">Dernière mesure</div>
+      <h2 id="instant-label">—</h2>
+      <p class="muted" id="instant-time"></p>
+      <div class="rows">
+        <div class="row">
+          <span data-i18n="confidence">Confiance</span>
+          <span id="confidence">—</span>
+        </div>
+        <div class="bar"><div id="confidence-bar"></div></div>
+        <div class="row" style="margin-top:8px">
+          <span data-i18n="precipitation">Précipitations</span>
+          <span id="precip">—</span>
+        </div>
+        <div class="row">
+          <span data-i18n="brightness">Luminosité</span>
+          <span id="brightness">—</span>
+        </div>
+        <div class="row">
+          <span data-i18n="frames">Images analysées</span>
+          <span id="frames">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title" data-i18n="how">Fonctionnement</div>
+      <p class="muted" data-i18n="howText">
+        La caméra prend une rafale d'images à intervalle régulier, en fait la moyenne et analyse
+        la luminosité, les couleurs, la netteté et ce qui scintille d'une image à l'autre.
+        Le résultat affiché est lissé sur les dernières mesures.
+      </p>
+      <p class="muted"><span data-i18n="raw">Données brutes :</span> <a href="status" target="_blank">status</a></p>
+    </section>
+  </div>
+</main>
+
 <script>
-const icons = { sunny: "☀️", cloudy: "☁️", fog: "🌫️", rain: "🌧️", snow: "❄️", night: "🌙" };
-async function refresh() {
-  try {
-    const r = await fetch("status", { cache: "no-store" });
-    const d = await r.json();
-    document.getElementById("icon").textContent = icons[d.condition] || "❔";
-    document.getElementById("label").textContent = d.label;
-    if (d.instant) {
-      const when = new Date(d.timestamp * 1000).toLocaleTimeString();
-      document.getElementById("detail").textContent =
-        `Dernière mesure à ${when} : ${d.instant.label} (confiance ${Math.round(d.instant.confidence * 100)} %)` +
-        (d.precipitation ? ", précipitations détectées" : "");
-      document.getElementById("features").innerHTML = Object.entries(d.features)
-        .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+  const ICONS = {
+    sunny: '<circle cx="32" cy="32" r="12" fill="currentColor"/><g stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M32 6v7M32 51v7M6 32h7M51 32h7M13.6 13.6l5 5M45.4 45.4l5 5M13.6 50.4l5-5M45.4 18.6l5-5"/></g>',
+    cloudy: '<path d="M20 48a11 11 0 0 1-1.5-21.9A15 15 0 0 1 47 23a12.5 12.5 0 0 1-1 25z" fill="currentColor"/>',
+    rain: '<path d="M20 38a10 10 0 0 1-1.4-19.9A14 14 0 0 1 45 15a11.5 11.5 0 0 1-1 23z" fill="currentColor"/><g stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M22 45l-3 9M33 45l-3 9M44 45l-3 9"/></g>',
+    snow: '<path d="M20 38a10 10 0 0 1-1.4-19.9A14 14 0 0 1 45 15a11.5 11.5 0 0 1-1 23z" fill="currentColor"/><g fill="currentColor"><circle cx="21" cy="48" r="3"/><circle cx="32" cy="54" r="3"/><circle cx="43" cy="48" r="3"/></g>',
+    fog: '<g stroke="currentColor" stroke-width="5" stroke-linecap="round"><path d="M10 22h44M16 32h38M10 42h40M18 52h30"/></g>',
+    night: '<path d="M40 8a24 24 0 1 0 16 38A20 20 0 0 1 40 8z" fill="currentColor"/>',
+    unknown: '<circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="6 6"/>'
+  };
+
+  const TEXT = {
+    fr: {
+      sunny: "Ensoleillé", cloudy: "Couvert", rain: "Pluie", snow: "Neige", fog: "Brouillard",
+      night: "Nuit", unknown: "En attente",
+      waiting: "En attente", running: "En service", offline: "Appli injoignable",
+      current: "Météo actuelle", lastMeasure: "Dernière mesure", confidence: "Confiance",
+      precipitation: "Précipitations", brightness: "Luminosité", frames: "Images analysées",
+      how: "Fonctionnement", raw: "Données brutes :",
+      howText: "La caméra prend une rafale d'images à intervalle régulier, en fait la moyenne et analyse la luminosité, les couleurs, la netteté et ce qui scintille d'une image à l'autre. Le résultat affiché est lissé sur les dernières mesures.",
+      detected: "Détectées", none: "Aucune",
+      measuredAt: t => `Mesurée à ${t}`,
+      stableSince: (t, ago) => `Mise à jour à ${t} (${ago})`,
+      firstMeasure: "Première mesure en cours, cela prend quelques secondes…",
+      ago: s => s < 60 ? "à l'instant" : `il y a ${Math.round(s / 60)} min`
+    },
+    en: {
+      sunny: "Sunny", cloudy: "Overcast", rain: "Rain", snow: "Snow", fog: "Fog",
+      night: "Night", unknown: "Waiting",
+      waiting: "Waiting", running: "Running", offline: "App unreachable",
+      current: "Current weather", lastMeasure: "Last measurement", confidence: "Confidence",
+      precipitation: "Precipitation", brightness: "Brightness", frames: "Frames analysed",
+      how: "How it works", raw: "Raw data:",
+      howText: "The camera grabs a burst of frames at regular intervals, averages them and analyses brightness, colours, sharpness and what flickers between frames. The displayed result is smoothed over the last measurements.",
+      detected: "Detected", none: "None",
+      measuredAt: t => `Measured at ${t}`,
+      stableSince: (t, ago) => `Updated at ${t} (${ago})`,
+      firstMeasure: "First measurement in progress, this takes a few seconds…",
+      ago: s => s < 60 ? "just now" : `${Math.round(s / 60)} min ago`
     }
-  } catch (e) {
-    document.getElementById("label").textContent = "Application injoignable";
+  };
+
+  const ORDER = ["sunny", "cloudy", "rain", "snow", "fog", "night"];
+  let lang = "fr";
+  let last = null;
+  let online = null;
+
+  try { lang = localStorage.getItem("meteo-lang") || "fr"; } catch (e) {}
+
+  const $ = id => document.getElementById(id);
+  const t = key => TEXT[lang][key];
+
+  function render() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll(".lang button").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+
+    const state = $("state");
+    state.className = "pill " + (online === false ? "ko" : last && last.instant ? "ok" : "wait");
+    state.textContent = online === false ? t("offline") : last && last.instant ? t("running") : t("waiting");
+
+    const cond = last && last.instant ? last.condition : "unknown";
+    $("now-icon").innerHTML = ICONS[cond] || ICONS.unknown;
+    $("now-label").textContent = t(cond) || cond;
+
+    $("tiles").innerHTML = ORDER.map(c =>
+      `<div class="tile${c === cond ? " active" : ""}"><svg viewBox="0 0 64 64">${ICONS[c]}</svg>${t(c)}</div>`
+    ).join("");
+
+    if (!last || !last.instant) {
+      $("now-sub").textContent = online === false ? "" : t("firstMeasure");
+      return;
+    }
+
+    const when = new Date(last.timestamp * 1000);
+    const time = when.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
+    const age = Math.max(0, (Date.now() - when.getTime()) / 1000);
+    $("now-sub").textContent = t("stableSince")(time, t("ago")(age));
+
+    $("instant-label").textContent = t(last.instant.condition) || last.instant.condition;
+    $("instant-time").textContent = t("measuredAt")(time);
+    const pct = Math.round(last.instant.confidence * 100);
+    $("confidence").textContent = pct + " %";
+    $("confidence-bar").style.width = pct + "%";
+    $("precip").innerHTML = last.precipitation
+      ? `<span class="badge rain">${t("detected")}</span>`
+      : `<span class="badge">${t("none")}</span>`;
+    $("brightness").textContent = Math.round(last.features.luma_mean / 255 * 100) + " %";
+    $("frames").textContent = last.features.frames;
   }
-}
-refresh();
-setInterval(refresh, 10000);
+
+  async function refresh() {
+    try {
+      const r = await fetch("status", { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      last = await r.json();
+      online = true;
+    } catch (e) {
+      online = false;
+    }
+    render();
+  }
+
+  /* Nom du modèle de caméra, pour le bandeau. */
+  async function loadDevice() {
+    try {
+      const r = await fetch("/axis-cgi/basicdeviceinfo.cgi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiVersion: "1.0", method: "getAllUnrestrictedProperties" })
+      });
+      const d = await r.json();
+      const p = d.data && d.data.propertyList;
+      if (p && p.ProdFullName) $("device").textContent = p.ProdFullName;
+    } catch (e) {}
+  }
+
+  document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem("meteo-lang", lang); } catch (e) {}
+    render();
+  }));
+
+  render();
+  loadDevice();
+  refresh();
+  setInterval(refresh, 10000);
 </script>
 </body>
 </html>

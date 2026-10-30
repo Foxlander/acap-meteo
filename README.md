@@ -56,7 +56,7 @@ Il faut Docker. La cible par défaut est `aarch64` (ARTPEC-8, ARTPEC-9, CV25…)
 ```sh
 docker build --tag meteo .
 docker cp $(docker create meteo):/opt/app ./build
-# => build/Meteo_Camera_0_2_0_aarch64.eap
+# => build/Meteo_Camera_0_3_0_aarch64.eap
 ```
 
 Pour une caméra ARTPEC-7 ou plus ancienne (32 bits) : `docker build --build-arg ARCH=armv7hf --tag meteo .`
