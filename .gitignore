@@ -1,3 +1,4 @@
 build/
 tests/test_weather
 *.o
+build-armv7hf/

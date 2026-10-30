@@ -1,7 +1,7 @@
 PROG1 = meteo
 OBJS1 = $(PROG1).c weather.c
 
-PKGS = gio-2.0 glib-2.0 vdostream axparameter
+PKGS = gio-2.0 glib-2.0 vdostream axparameter axevent
 
 CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKGS))
 LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS))

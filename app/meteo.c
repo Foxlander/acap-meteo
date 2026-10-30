@@ -6,11 +6,13 @@
  *   - capture une rafale de FrameCount images espacées de FrameSpacingMs,
  *   - fait la moyenne des images et calcule des indicateurs (voir weather.c),
  *   - classe la météo, lisse le résultat sur les HistorySize dernières rafales,
- *   - publie le résultat dans le syslog et en JSON sur
- *     http://<camera>/local/meteo/status (reverse proxy vers localhost:2001).
+ *   - publie le résultat dans le syslog, en JSON sur
+ *     http://<camera>/local/meteo/status (reverse proxy vers localhost:2001)
+ *     et sous forme d'événement Axis (utilisable dans les règles d'action).
  */
 #include "weather.h"
 
+#include <axsdk/axevent.h>
 #include <axsdk/axparameter.h>
 #include <gio/gio.h>
 #include <glib-unix.h>
@@ -45,6 +47,11 @@ typedef struct {
 
 static GMainLoop *main_loop;
 static AXParameter *params;
+
+/* Événement Axis "Météo" : n'est manipulé que depuis la boucle principale. */
+static AXEventHandler *event_handler;
+static guint event_declaration;
+static gboolean event_ready;
 
 /* Dernier résultat, lu par le serveur HTTP depuis d'autres threads. */
 static GMutex result_lock;
@@ -108,6 +115,72 @@ static void read_config(Config *c) {
     t->sunny_sky_luma = param_double("SunnySkyLuma", d.sunny_sky_luma);
     t->sunny_saturation = param_double("SunnySaturation", d.sunny_saturation);
     t->sky_ratio = CLAMP(param_double("SkyRatio", d.sky_ratio), 0.05, 1.0);
+}
+
+/*
+ * Construit le contenu de l'événement : la condition en texte, plus un
+ * booléen par condition pour pouvoir écrire une règle du type
+ * "tant qu'il pleut, faire ...".
+ */
+static AXEventKeyValueSet *weather_event_values(WeatherCondition condition) {
+    AXEventKeyValueSet *kvs = ax_event_key_value_set_new();
+    const gchar *code = weather_condition_code(condition);
+
+    ax_event_key_value_set_add_key_values(kvs, NULL,
+                                          "topic0", "tnsaxis", "CameraApplicationPlatform", AX_VALUE_TYPE_STRING,
+                                          "topic1", "tnsaxis", "Meteo", AX_VALUE_TYPE_STRING,
+                                          "topic2", "tnsaxis", "Weather", AX_VALUE_TYPE_STRING,
+                                          "condition", NULL, code, AX_VALUE_TYPE_STRING,
+                                          NULL);
+    ax_event_key_value_set_add_nice_names(kvs, "topic1", "tnsaxis", NULL, "Météo Caméra", NULL);
+    ax_event_key_value_set_add_nice_names(kvs, "topic2", "tnsaxis", NULL, "Météo", NULL);
+    ax_event_key_value_set_mark_as_data(kvs, "condition", NULL, NULL);
+
+    for (int c = 0; c < WEATHER_COUNT; c++) {
+        gboolean active = (int)condition == c;
+        const gchar *key = weather_condition_code((WeatherCondition)c);
+        ax_event_key_value_set_add_key_value(kvs, key, NULL, &active, AX_VALUE_TYPE_BOOL, NULL);
+        ax_event_key_value_set_mark_as_data(kvs, key, NULL, NULL);
+        ax_event_key_value_set_add_nice_names(kvs, key, NULL,
+                                              weather_condition_label((WeatherCondition)c), NULL, NULL);
+    }
+    return kvs;
+}
+
+static void on_event_declared(guint declaration, gpointer data) {
+    (void)data;
+    syslog(LOG_INFO, "Événement Météo déclaré (%u)", declaration);
+    event_ready = TRUE;
+}
+
+static void declare_weather_event(void) {
+    GError *error = NULL;
+    event_handler = ax_event_handler_new();
+    AXEventKeyValueSet *kvs = weather_event_values(WEATHER_COUNT);
+    /* stateless = FALSE : événement à état, la caméra connaît la météo courante. */
+    if (!ax_event_handler_declare(event_handler, kvs, FALSE, &event_declaration, on_event_declared,
+                                  NULL, &error)) {
+        syslog(LOG_ERR, "Impossible de déclarer l'événement : %s", error->message);
+        g_error_free(error);
+    }
+    ax_event_key_value_set_free(kvs);
+}
+
+/* Appelé dans la boucle principale (via g_idle_add) quand la météo stable change. */
+static gboolean send_weather_event(gpointer data) {
+    WeatherCondition condition = (WeatherCondition)GPOINTER_TO_INT(data);
+    GError *error = NULL;
+    if (!event_ready) return G_SOURCE_REMOVE;
+
+    AXEventKeyValueSet *kvs = weather_event_values(condition);
+    AXEvent *event = ax_event_new2(kvs, NULL);
+    if (!ax_event_handler_send_event(event_handler, event_declaration, event, &error)) {
+        syslog(LOG_ERR, "Impossible d'envoyer l'événement : %s", error->message);
+        g_error_free(error);
+    }
+    ax_event_free(event);
+    ax_event_key_value_set_free(kvs);
+    return G_SOURCE_REMOVE;
 }
 
 /* Capture une rafale d'images et l'ajoute à l'accumulateur. Retourne FALSE en cas d'erreur. */
@@ -199,6 +272,7 @@ static gpointer capture_thread(gpointer data) {
             if (stable != last_stable) {
                 syslog(LOG_NOTICE, "Météo : %s", weather_condition_label(stable));
                 last_stable = stable;
+                g_idle_add(send_weather_event, GINT_TO_POINTER(stable));
             }
         }
 
@@ -283,6 +357,7 @@ int main(void) {
     g_unix_signal_add(SIGTERM, on_signal, NULL);
     g_unix_signal_add(SIGINT, on_signal, NULL);
 
+    declare_weather_event();
     GSocketService *http = start_http_server();
     GThread *capture = g_thread_new("capture", capture_thread, NULL);
 
@@ -296,6 +371,10 @@ int main(void) {
 
     g_socket_service_stop(http);
     g_object_unref(http);
+    if (event_handler) {
+        ax_event_handler_undeclare(event_handler, event_declaration, NULL);
+        ax_event_handler_free(event_handler);
+    }
     ax_parameter_free(params);
     g_main_loop_unref(main_loop);
     syslog(LOG_INFO, "Arrêt de l'ACAP météo");

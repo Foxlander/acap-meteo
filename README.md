@@ -42,6 +42,12 @@ Toutes les `IntervalSeconds` secondes (5 min par défaut) :
   `condition` est la valeur lissée, `instant` la dernière mesure seule.
 - **Syslog** (*System* → *Logs*) : une ligne par mesure, et une ligne
   `Météo : …` à chaque changement.
+- **Événement Axis** *Météo Caméra → Météo* (événement à état), envoyé à chaque
+  changement de la météo lissée. Il contient `condition` (texte) et un booléen
+  par condition (`sunny`, `cloudy`, `fog`, `rain`, `snow`, `night`). Dans
+  *System* → *Events* → *Rules*, on peut par exemple choisir « Météo » comme
+  condition avec `rain` actif, puis une action (e-mail, MQTT, sortie, preset
+  PTZ…).
 
 ## Compiler
 
@@ -50,10 +56,14 @@ Il faut Docker. La cible par défaut est `aarch64` (ARTPEC-8, ARTPEC-9, CV25…)
 ```sh
 docker build --tag meteo .
 docker cp $(docker create meteo):/opt/app ./build
-# => build/Meteo_Camera_0_1_0_aarch64.eap
+# => build/Meteo_Camera_0_2_0_aarch64.eap
 ```
 
-Pour une caméra ARTPEC-7 (32 bits) : `docker build --build-arg ARCH=armv7hf --tag meteo .`
+Pour une caméra ARTPEC-7 ou plus ancienne (32 bits) : `docker build --build-arg ARCH=armv7hf --tag meteo .`
+
+Pour connaître l'architecture de ta caméra, ouvre
+`http://<ip-camera>/axis-cgi/basicdeviceinfo.cgi` (ou regarde le champ
+*Architecture* / *Soc* dans *System* → *Plain config*) : `aarch64` ou `armv7hf`.
 
 ## Installer
 
@@ -105,8 +115,6 @@ make -C tests check
 
 ## Pistes d'amélioration
 
-- **Événement Axis** (API `axevent`) à chaque changement de météo, pour
-  déclencher des règles d'action (e-mail, MQTT, sortie…).
 - **Modèle de deep learning** sur les caméras avec DLPU (ARTPEC-8/9, CV25) :
   un petit classifieur (MobileNet entraîné sur un jeu type *Multi-class Weather
   Dataset*, puis sur des images de la caméra) exécuté via l'API **Larod**.
@@ -121,7 +129,7 @@ make -C tests check
 ```
 Dockerfile           Compilation avec l'ACAP Native SDK 12.2
 app/manifest.json    Description de l'ACAP, paramètres, reverse proxy HTTP
-app/meteo.c          Capture VDO, paramètres, serveur HTTP, syslog
+app/meteo.c          Capture VDO, paramètres, serveur HTTP, syslog, événements
 app/weather.c/.h     Algorithme (moyenne, indicateurs, classification)
 app/html/index.html  Page web de l'application
 tests/               Tests sur PC
